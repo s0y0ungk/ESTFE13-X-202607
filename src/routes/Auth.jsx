@@ -1,7 +1,12 @@
-import { useState } from "react";
-import { Box, Typography, TextField, Button } from "@mui/material";
+import { useState, useRef } from "react";
+import { Box, Typography, TextField, Button, Divider, Snackbar } from "@mui/material";
 import { authService } from "../firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+} from "firebase/auth";
 
 function Auth() {
   const [newAccount, setNewAccount] = useState(true);
@@ -9,8 +14,13 @@ function Auth() {
     email: "",
     password: "",
   });
+  const [error, setError] = useState("");
+  const [errorOpen, setErrorOpen] = useState(false);
+
+  const emailRef = useRef(null);
 
   const auth = authService;
+  const provider = new GoogleAuthProvider();
 
   const handleChange = e => {
     const { name, value } = e.target;
@@ -34,10 +44,48 @@ function Auth() {
           const errorCode = error.code;
           const errorMessage = error.message;
           console.log(errorCode, errorMessage);
+          setError(
+            errorMessage.includes("email-already-in-use")
+              ? "이메일이 이미 사용중입니다."
+              : errorMessage,
+          ); //에러메시지 생성
+          setErrorOpen(true);
+          setForm({ email: "", password: "" });
+          emailRef.current.focus();
         });
     } else {
       //로그인
+      signInWithEmailAndPassword(auth, form.email, form.password)
+        .then(userCredential => {
+          // Signed in
+          const user = userCredential.user;
+          // ...
+        })
+        .catch(error => {
+          const errorCode = error.code;
+          const errorMessage = error.message;
+          console.log(errorCode, errorMessage);
+          setError(errorMessage); //에러 메시지 생성
+          setErrorOpen(true);
+          setForm({ email: "", password: "" });
+          emailRef.current.focus();
+        });
     }
+  };
+  const onGoogleSignIn = () => {
+    signInWithPopup(auth, provider)
+      .then(result => {
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        const token = credential.accessToken;
+        const user = result.user;
+      })
+      .catch(error => {
+        const errorCode = error.code;
+        const errorMessage = error.message;
+        const email = error.customData.email;
+        const credential = GoogleAuthProvider.credentialFromError(error);
+        console.log(errorCode, errorMessage, email, credential);
+      });
   };
   return (
     <>
@@ -52,6 +100,8 @@ function Auth() {
           name="email"
           variant="outlined"
           onChange={handleChange}
+          inputRef={emailRef}
+          value={form.email}
         />
         <TextField
           sx={{ mt: 2 }}
@@ -61,9 +111,37 @@ function Auth() {
           name="password"
           variant="outlined"
           onChange={handleChange}
+          value={form.password}
         />
         <Button sx={{ mt: 2 }} type="submit" variant="contained">
           {newAccount ? "회원가입" : "로그인"}
+        </Button>
+
+        <Snackbar
+          open={errorOpen}
+          autoHideDuration={3000}
+          message={error}
+          onClose={() => {
+            setErrorOpen(false);
+          }}
+        />
+
+        <Divider sx={{ my: 3 }} />
+
+        <Button sx={{ mt: 2 }} type="button" variant="contained" onClick={onGoogleSignIn}>
+          {newAccount ? "구글로 회원가입" : "구글로 로그인"}
+        </Button>
+
+        <Divider sx={{ my: 3 }} />
+        <Button
+          sx={{ mt: 2 }}
+          type="button"
+          variant="contained"
+          onClick={() => {
+            setNewAccount(prev => !prev);
+          }}
+        >
+          {newAccount ? "로그인으로 전환" : "회원가입으로 전환"}
         </Button>
       </Box>
     </>
