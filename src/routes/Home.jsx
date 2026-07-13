@@ -1,10 +1,50 @@
-import { Box, Typography, TextField, Button, Divider, useScrollTrigger } from "@mui/material";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import {
+  Box,
+  Typography,
+  TextField,
+  Button,
+  Divider,
+  useScrollTrigger,
+  List,
+  ListItem,
+  ListItemText,
+} from "@mui/material";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  query,
+  where,
+  getDocs,
+  orderBy,
+  limit,
+  onSnapshot,
+} from "firebase/firestore";
 import { db } from "../firebase";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Comment from "../components/Comment";
 
-function Home() {
+function Home({ userId }) {
   const [comment, setComment] = useState("");
+  const [comments, setComments] = useState([]);
+  /*
+  useEffect로 데이터를 조회 결과를 변수명 comments할당
+  */
+  const getComments = async () => {
+    const q = query(collection(db, "comments"), orderBy("date", "desc"), limit(5));
+
+    onSnapshot(q, querySnapshot => {
+      const commentsArray = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      setComments(commentsArray);
+    });
+  };
+
+  useEffect(() => {
+    getComments();
+  }, []);
+
+  console.log(comments);
 
   const handleChange = e => {
     setComment(e.target.value);
@@ -16,8 +56,10 @@ function Home() {
         // comment: comment,
         comment,
         date: serverTimestamp(),
+        uid: userId,
       });
       setComment("");
+      // getComments();
     } catch (e) {
       console.error("글 추가시 에러가 발생했습니다.", e);
     }
@@ -46,6 +88,11 @@ function Home() {
         </Button>
       </Box>
       <Divider sx={{ my: 3 }} />
+      <List sx={{ width: "100%" }}>
+        {comments.map(item => (
+          <Comment key={item.id} item={item} isShown={userId === item.uid} />
+        ))}
+      </List>
     </>
   );
 }
