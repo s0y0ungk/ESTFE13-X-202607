@@ -21,8 +21,10 @@ import {
   limit,
   onSnapshot,
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { db, storageService } from "../firebase";
+import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { useEffect, useState, useRef } from "react";
+import { v4 as uuidv4 } from "uuid";
 import Comment from "../components/Comment";
 
 function Home({ userId }) {
@@ -30,6 +32,9 @@ function Home({ userId }) {
   const [comments, setComments] = useState([]);
   const [attachment, setAttachment] = useState(null);
   const fileInputRef = useRef(null);
+
+  const storage = storageService; //storage 초기화
+  const storageRef = ref(storage); //참조 초기화
 
   /*
   useEffect로 데이터를 조회 결과를 변수명 comments할당
@@ -56,14 +61,22 @@ function Home({ userId }) {
   const onSubmit = async e => {
     e.preventDefault();
     try {
-      const docRef = await addDoc(collection(db, "comments"), {
-        // comment: comment,
+      let imageURL = null;
+      if (attachment) {
+        //첨부파일이 있으면
+        const storageRef = ref(storage, `${userId}/${uuidv4()}`);
+        const snapshot = await uploadString(storageRef, attachment, "data_url");
+        imageURL = await getDownloadURL(storageRef); //이미지 절대 경로 할당
+      }
+      const data = {
         comment,
         date: serverTimestamp(),
         uid: userId,
-      });
+        image: imageURL,
+      };
+      const docRef = await addDoc(collection(db, "comments"), data); //firestore에 글 저장
       setComment("");
-      // getComments();
+      onClearFile();
     } catch (e) {
       console.error("글 추가시 에러가 발생했습니다.", e);
     }
